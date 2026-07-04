@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Observatoire Sentinel — Bizerte Ichkeul</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg-main: #0d1a0d;
+      --bg-card: rgba(255,255,255,0.08);
+      --bg-soft: #132613;
+      --text-main: #ffffff;
+      --text-soft: #9FE1CB;
+      --accent: #ff7a1a;
+      --green: #7ed957;
+      --red: #ff4d4d;
+      --yellow: #ffd166;
+      --blue: #4ea8de;
+      --border: rgba(255,255,255,0.15);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-main);
+    }
+
+    header {
+      padding: 28px 6%;
+      background: linear-gradient(135deg, #0d1a0d, #173817);
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      margin: 0 0 8px 0;
+      font-size: 34px;
+    }
+
+    header p {
+      margin: 0;
+      color: var(--text-soft);
+      font-size: 16px;
+    }
+
+    .status {
+      margin-top: 14px;
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(126, 217, 87, 0.12);
+      border: 1px solid rgba(126, 217, 87, 0.4);
+      color: var(--green);
+      font-size: 14px;
+    }
+
+    main {
+      padding: 28px 6%;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: 22px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+
+    .card h2 {
+      margin: 0 0 14px 0;
+      font-size: 22px;
+      color: var(--text-main);
+    }
+
+    #map {
+      width: 100%;
+      height: 460px;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+
+    .kpi {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .kpi .label {
+      color: var(--text-soft);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .kpi .value {
+      font-size: 28px;
+      font-weight: bold;
+    }
+
+    .section {
+      margin-top: 24px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      color: var(--text-soft);
+      background: rgba(255,255,255,0.05);
+    }
+
+    a {
+      color: var(--text-soft);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .badge {
+      padding: 5px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: bold;
+      display: inline-block;
+    }
+
+    .vert {
+      background: rgba(126,217,87,0.2);
+      color: var(--green);
+    }
+
+    .jaune {
+      background: rgba(255,209,102,0.2);
+      color: var(--yellow);
+    }
+
+    .orange {
+      background: rgba(255,122,26,0.2);
+      color: var(--accent);
+    }
+
+    .rouge {
+      background: rgba(255,77,77,0.2);
+      color: var(--red);
+    }
+
+    .gris {
+      background: rgba(255,255,255,0.12);
+      color: #ddd;
+    }
+
+    .latest-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .image-link {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--border);
+      padding: 12px;
+      border-radius: 12px;
+    }
+
+    .image-link strong {
+      color: var(--accent);
+    }
+
+    .footer {
+      margin-top: 32px;
+      color: var(--text-soft);
+      font-size: 13px;
+      text-align: center;
+      opacity: 0.8;
+    }
+
+    @media (max-width: 950px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+
+      header h1 {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Observatoire Sentinel — Bizerte Ichkeul</h1>
+    <p>Suivi automatique du bassin versant Ichkeul — Lac de Bizerte par Sentinel-2, Google Drive, Google Sheets et Apps Script.</p>
+    <div id="apiStatus" class="status">Connexion à l’API...</div>
+  </header>
+
+  <main>
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="label">NDVI moyen</div>
+        <div id="ndviValue" class="value">--</div>
+      </div>
+
+      <div class="kpi">
+        <div class="label">NDWI moyen</div>
+        <div id="ndwiValue" class="value">--</div>
+      </div>
+
+      <div class="kpi">
+        <div class="label">Surface en eau estimée</div>
+        <div id="waterValue" class="value">--</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Carte de la zone suivie</h2>
+        <div id="map"></div>
+      </section>
+
+      <section class="card">
+        <h2>Dernières images disponibles</h2>
+        <div id="latestImages" class="latest-list">
+          Chargement...
+        </div>
+      </section>
+    </div>
+
+    <section class="card section">
+      <h2>Évolution des indicateurs</h2>
+      <canvas id="chartIndicateurs" height="110"></canvas>
+    </section>
+
+    <section class="card section">
+      <h2>Historique des indicateurs</h2>
+      <div id="tableIndicateurs">Chargement...</div>
+    </section>
+
+    <section class="card section">
+      <h2>Anomalies détectées</h2>
+      <div id="tableAnomalies">Chargement...</div>
+    </section>
+
+    <div class="footer">
+      Observatoire expérimental — Sentinel-2 / Apps Script / Google Drive / Google Sheets / GitHub Pages
+    </div>
+  </main>
+
+  <script>
+    // Remplacez cette URL par votre URL Apps Script qui se termine par /exec
+    const API_URL = "https://script.google.com/macros/s/AKfycbyaCDA7GFYe1rCeJ_Zj0A-CQmfcizvn-EQwX4AmIvIbzc8hDMPjArcZ4itWTG9CViVP9g/exec";
+
+    let map;
+    let chart;
+
+    async function chargerDonnees() {
+      const status = document.getElementById("apiStatus");
+
+      try {
+        const response = await fetch(API_URL + "?action=all");
+        const json = await response.json();
+
+        if (json.status !== "success") {
+          throw new Error("Réponse API non valide");
+        }
+
+        status.textContent = "API connectée — données chargées";
+        status.style.color = "#7ed957";
+
+        const data = json.data;
+
+        afficherCarte(data.zones || []);
+        afficherDernieresImages(data.latest || []);
+        afficherKPI(data.indicateurs || []);
+        afficherGraphique(data.indicateurs || []);
+        afficherTableIndicateurs(data.indicateurs || []);
+        afficherTableAnomalies(data.anomalies || []);
+
+      } catch (error) {
+        console.error(error);
+        status.textContent = "Erreur de connexion à l’API";
+        status.style.color = "#ff4d4d";
+      }
+    }
+
+    function afficherCarte(zones) {
+      if (!map) {
+        map = L.map("map").setView([37.05, 9.55], 9);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap"
+        }).addTo(map);
+      }
+
+      if (!zones.length) return;
+
+      const zone = zones[0];
+
+      const bbox = String(zone.bbox)
+        .split(",")
+        .map(v => Number(v.trim()));
+
+      if (bbox.length !== 4 || bbox.some(isNaN)) return;
+
+      const lonMin = bbox[0];
+      const latMin = bbox[1];
+      const lonMax = bbox[2];
+      const latMax = bbox[3];
+
+      const bounds = [
+        [latMin, lonMin],
+        [latMax, lonMax]
+      ];
+
+      L.rectangle(bounds, {
+        color: "#ff7a1a",
+        weight: 3,
+        fillOpacity: 0.08
+      }).addTo(map);
+
+      L.marker([
+        (latMin + latMax) / 2,
+        (lonMin + lonMax) / 2
+      ])
+        .addTo(map)
+        .bindPopup(`<strong>${zone.nom_zone}</strong><br>${zone.type_zone}`);
+
+      map.fitBounds(bounds);
+    }
+
+    function afficherDernieresImages(images) {
+      const container = document.getElementById("latestImages");
+
+      if (!images.length) {
+        container.innerHTML = "Aucune image récente trouvée.";
+        return;
+      }
+
+      container.innerHTML = images.map(img => `
+        <div class="image-link">
+          <strong>${img.type_image}</strong><br>
+          Date : ${img.date_acquisition || "--"}<br>
+          Nuages : ${img.nuages || "--"} %<br>
+          <a href="${img.lien_drive}" target="_blank">Ouvrir dans Google Drive</a>
+        </div>
+      `).join("");
+    }
+
+    function afficherKPI(indicateurs) {
+      if (!indicateurs.length) return;
+
+      const last = indicateurs[indicateurs.length - 1];
+
+      document.getElementById("ndviValue").textContent =
+        last.ndvi_mean !== "" ? Number(last.ndvi_mean).toFixed(4) : "--";
+
+      document.getElementById("ndwiValue").textContent =
+        last.ndwi_mean !== "" ? Number(last.ndwi_mean).toFixed(4) : "--";
+
+      document.getElementById("waterValue").textContent =
+        last.surface_eau_ha !== "" && last.surface_eau_ha !== undefined
+          ? Number(last.surface_eau_ha).toFixed(0) + " ha"
+          : "--";
+    }
+
+    function afficherGraphique(indicateurs) {
+      const labels = indicateurs.map(row => row.date || "");
+      const ndvi = indicateurs.map(row => Number(row.ndvi_mean));
+      const ndwi = indicateurs.map(row => Number(row.ndwi_mean));
+
+      const ctx = document.getElementById("chartIndicateurs");
+
+      if (chart) {
+        chart.destroy();
+      }
+
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "NDVI moyen",
+              data: ndvi,
+              tension: 0.3
+            },
+            {
+              label: "NDWI moyen",
+              data: ndwi,
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              labels: {
+                color: "#ffffff"
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: "#ffffff" },
+              grid: { color: "rgba(255,255,255,0.1)" }
+            },
+            y: {
+              ticks: { color: "#ffffff" },
+              grid: { color: "rgba(255,255,255,0.1)" }
+            }
+          }
+        }
+      });
+    }
+
+    function afficherTableIndicateurs(indicateurs) {
+      const container = document.getElementById("tableIndicateurs");
+
+      if (!indicateurs.length) {
+        container.innerHTML = "Aucun indicateur disponible.";
+        return;
+      }
+
+      const rows = indicateurs.slice().reverse().map(row => `
+        <tr>
+          <td>${row.date || ""}</td>
+          <td>${row.zone_id || ""}</td>
+          <td>${row.ndvi_mean || ""}</td>
+          <td>${row.ndwi_mean || ""}</td>
+          <td>${row.surface_eau_ha || ""}</td>
+        </tr>
+      `).join("");
+
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Zone</th>
+              <th>NDVI moyen</th>
+              <th>NDWI moyen</th>
+              <th>Surface eau ha</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    function afficherTableAnomalies(anomalies) {
+      const container = document.getElementById("tableAnomalies");
+
+      if (!anomalies.length) {
+        container.innerHTML = "Aucune anomalie enregistrée.";
+        return;
+      }
+
+      const rows = anomalies.slice().reverse().map(row => {
+        const niveau = String(row.niveau || "gris").toLowerCase();
+
+        return `
+          <tr>
+            <td>${row.date || ""}</td>
+            <td>${row.indicateur || ""}</td>
+            <td>${row.valeur_actuelle || ""}</td>
+            <td>${row.valeur_reference || ""}</td>
+            <td>${row.ecart || ""}</td>
+            <td><span class="badge ${niveau}">${row.niveau || ""}</span></td>
+            <td>${row.message || ""}</td>
+          </tr>
+        `;
+      }).join("");
+
+      container.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Indicateur</th>
+              <th>Valeur actuelle</th>
+              <th>Référence</th>
+              <th>Écart</th>
+              <th>Niveau</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    chargerDonnees();
+  </script>
+</body>
+</html>
